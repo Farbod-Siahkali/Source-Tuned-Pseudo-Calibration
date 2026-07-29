@@ -1,0 +1,8 @@
+jupyter
+matplotlib
+numpy
+plotly
+scienceplots
+torch
+torchvision
+tqdm
