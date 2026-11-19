@@ -1,3 +1,5 @@
+import random
+
 import numpy as np
 import torch
 from torch import nn
@@ -68,14 +70,24 @@ class SmallVAE(nn.Module):
         return self.decoder(self.decoder_fc(z).view(-1, 64, self.side, self.side)), mu, logvar
 
 
-def train_vae(dataset, device, epochs=100, batch_size=256, lr=1e-4, weight_decay=0.01, beta=1.2, seed=0):
+def _seed_all(seed):
+    random.seed(seed)
+    np.random.seed(seed)
     torch.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+
+
+def train_vae(dataset, device, seed, epochs=100, batch_size=256, lr=1e-4, weight_decay=0.01, beta=1.2):
+    _seed_all(seed)
     x0 = dataset[0][0]
     vae = SmallVAE(x0.shape[0], x0.shape[-1]).to(device)
     opt = torch.optim.AdamW(vae.parameters(), lr=lr, weight_decay=weight_decay)
-    for _ in range(epochs):
+    for epoch in range(1, epochs + 1):
+        _seed_all(seed + epoch)
         vae.train()
-        for x, _ in DataLoader(dataset, batch_size=batch_size, shuffle=True):
+        loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0, pin_memory=True,
+                            generator=torch.Generator().manual_seed(seed + epoch))
+        for x, _ in loader:
             x = x.to(device)
             rec, mu, logvar = vae(x)
             sse = (rec - x).square().flatten(1).sum(1).mean()
